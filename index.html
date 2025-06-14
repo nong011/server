@@ -219,12 +219,12 @@ function drawGauges() {
       ['Label', 'Value'], ['°C', last.temp]
     ]);
     const options = {
-      redFrom: -2, redTo: 15,
+      redFrom: 5, redTo: 15,
       greenFrom: 15, greenTo: 25,
-      yellowFrom: 25, yellowTo: 30,
-      max: 30,
-      min: -2,
-      majorTicks: ['-2','5','10','15','20','25','30'],
+      yellowFrom: 25, yellowTo: 35,
+      max: 35,
+      min: 5,
+      majorTicks: ['5','10','15','20','25','30','35'],
       minorTicks: 5
     };
     new google.visualization.Gauge(document.getElementById(`gauge_${sheet}`)).draw(data, options);
