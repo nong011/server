@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<!--
+📦 Version: v3.3-DigitalFridge-THSarabunPSK-FontFix-LLM-Debug-V3
+📅 วันที่: 2025-07-18
+👤 ผู้พัฒนา: Dr. Krairat Komdee (ปรับปรุงโดย Friday)
+
+-->
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="refresh" content="60">
+  <title>Server Temp/Humidity/WaterLeak Monitor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai+Rounded:wght@400;700&display=swap" rel="stylesheet">
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+
+  <style>
+    body {
+      font-family: 'Noto Sans Thai Rounded', sans-serif;
+      background-color: #f6f1fb;
+      margin: 0;
+      padding: 2rem;
+      color: #4a4a4a;
+    }
+    .container {
+      background-color: #ffffff;
+      max-width: 960px;
+      margin: auto;
+      padding: 2rem;
+      border-radius: 20px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.9rem;
+      color: #999;
+    }
+    .timestamp {
+      text-align: center;
+      font-size: 1rem;
+      margin-bottom: 0.3rem;
+      color: #7c3aed;
+    }
+    .range-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .range-buttons button {
+      background-color: #f3e8ff;
+      border: none;
+      border-radius: 1rem;
+      padding: 0.5rem 1.2rem;
+      font-size: 1rem;
+      color: #6b21a8;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    }
+    .range-buttons button.active,
+    .range-buttons button:hover {
+      background-color: #d8b4fe;
+      font-weight: bold;
+    }
+    .gauges {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+    .gauge-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+      border-radius: 20px;
+      background-color: #fff;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      flex: 1; /* Make gauges flex evenly */
+      min-width: 280px; /* Ensure minimum width for smaller screens */
+    }
+    .gauge-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #6b21a8;
+      margin-bottom: 0.5rem;
+    }
+    .gauge-time {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: #444;
+    }
+    .alert {
+      filter: brightness(1.1); /* Slightly brighter for alert */
+      background-color: #ffeaea !important; /* Override background for alert */
+      border: 2px solid #ff5c5c;
+    }
+    .offline {
+      filter: grayscale(0.5); /* Dim for offline */
+    }
+    .llm-button {
+        background-color: #7e5bef;
+        color: white;
+        border: none;
+        border-radius: 0.75rem;
+        padding: 0.4rem 0.8rem;
+        font-size: 0.85rem;
+        cursor: pointer;
+        margin-top: 0.5rem;
+        transition: background-color 0.3s ease;
+    }
+    .llm-button:hover {
+        background-color: #6b21a8;
+    }
+
+    /* Message Box / Modal Styles */
+    .message-box-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    .message-box-overlay.visible {
+        opacity: 1;
+        visibility: visible;
+    }
+    .message-box-content {
+        background: #fff;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        max-width: 500px;
+        width: 90%;
+        text-align: center;
+        position: relative;
+        transform: translateY(-20px);
+        transition: transform 0.3s ease;
+    }
+    .message-box-overlay.visible .message-box-content {
+        transform: translateY(0);
+    }
+    .message-box-content h3 {
+        color: #7e5bef;
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.3rem;
+    }
+    .message-box-content p {
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+        color: #555;
+    }
+    .message-box-content button {
+        background-color: #7e5bef;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 0.6rem 1.5rem;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+    .message-box-content button:hover {
+        background-color: #6b21a8;
+    }
+    .loading-spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #7e5bef;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        animation: spin 1s linear infinite;
+        margin: 1rem auto;
+        display: none; /* Hidden by default */
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div style="text-align:center; margin-bottom: 1rem;">
+    <img src="https://phayaohospital.moph.go.th/assets/images/logonew.png" alt="Phayao Hospital Logo" style="max-width: 1030px; width: 100%; height: auto; object-fit: contain;">
+  </div>
+  <div class="container">
+    <h1 style="text-align:center; color:#7e5bef">DashBoard Temperature and Humidity @Server Room Phayao Hospital</h1>
+    <div class="timestamp" id="realtime_clock">Loading time...</div>
+    <div class="timestamp" id="latest_time"></div>
+
+    <div class="gauges" id="gauges_section"></div>
+
+    <div class="range-buttons">
+      <button onclick="updateChart(1, event)" class="active">ชั่วโมง</button>
+      <button onclick="updateChart(24, event)">วัน</button>
+      <button onclick="updateChart(168, event)">สัปดาห์</button>
+      <button onclick="updateChart(720, event)">เดือน</button>
+    </div>
+
+    <div id="chart_div" style="width: 100%; height: 400px;"></div>
+    <div id="humidity_chart" style="width: 100%; height: 400px;"></div>
+
+    <div style="text-align: center; margin-top: 1rem;">
+      <label for="serverSelect">เลือกเครื่อง:</label>
+      <select id="serverSelect"></select>
+      <label for="monthSelect">เลือกเดือน:</label>
+      <select id="monthSelect"></select>
+      <button onclick="exportMonthlyPDF()" style="background-color: #c084fc; color: white; padding: 0.6rem 1.5rem; border: none; border-radius: 10px; font-size: 1rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        📄 Export รายเดือนเป็น PDF
+      </button>
+    </div>
+    <div class="footer">© 2025 ระบบติดตามอุณหภูมิ ความชื้น By... Krairat Komdee, MD.</div>
+  </div>
+
+  <!-- Message Box / Modal Structure -->
+  <div id="messageBoxOverlay" class="message-box-overlay">
+    <div class="message-box-content">
+      <h3 id="messageBoxTitle"></h3>
+      <div id="messageBoxSpinner" class="loading-spinner"></div>
+      <p id="messageBoxMessage"></p>
+      <button onclick="hideMessageBox()">ปิด</button>
+    </div>
+  </div>
+
+<script>
+const SHEET_ID = '1bdzraltDO3EhQxMEAKAyuqCRWRm5RRMpXfe_mr96kkk';
+// กำหนดข้อมูล Server และสีในที่เดียว เพื่อความยืดหยุ่น
+const SERVER_CONFIGS = [
+    { name: 'Server1', displayName: 'ServerRoom @6th Fl OPD', color: '#FFB6D9', tempMin: 18, tempMax: 27 }, // Temp range for Server room
+    { name: 'Server2', displayName: 'ServerRoom @DR site', color: '#BED599', tempMin: 18, tempMax: 27 },
+    { name: 'Server3', displayName: 'ServerRoom @3rd Fl ER', color: '#FFF9B0', tempMin: 18, tempMax: 27 }
+];
+
+let fullDataBySheet = {};
+let currentRange = 1; // Default to 1 hour
+const OFFLINE_THRESHOLD_MINUTES = 6; // Device is considered offline if last update is older than this (in minutes)
+
+// Static image URLs to embed directly or manage centrally if not too many
+const IMAGE_URLS = {
+    online: 'https://img2.pic.in.th/pic/ChatGPT-Image-Jul-17-2025-09_42_41-PM.png',
+    outOfRange: 'https://img5.pic.in.th/file/secure-sv1/ChatGPT-Image-Jul-17-2025-09_38_28-PM.png',
+    offline: 'https://img5.pic.in.th/file/secure-sv1/ChatGPT-Image-Jul-17-2025-09_45_15-PM.png'
+};
+
+// Function to safely parse float values, returning null if invalid
+function safeParseFloat(value) {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? null : parsed;
+}
+
+// Function to parse date strings in DD/MM/YYYY HH:mm:ss format
+function parseDateDDMMYYYY(str) {
+    if (!str) return null;
+    const parts = str.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})/);
+    if (!parts) return null;
+    const [, day, month, year, hour, minute, second] = parts;
+    return new Date(year, month - 1, day, hour, minute, second);
+}
+
+// Function to fetch data from Google Sheets (using Public CSV endpoint for simplicity and robustness)
+async function fetchSheetData(sheetName) {
+    try {
+        const response = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const text = await response.text();
+        const jsonString = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+        const json = JSON.parse(jsonString);
+
+        const data = json.table.rows.map(row => {
+            const timeStr = row.c[0]?.f || row.c[0]?.v;
+            return {
+                time: parseDateDDMMYYYY(timeStr),
+                temp: safeParseFloat(row.c[1]?.v),
+                hum: safeParseFloat(row.c[2]?.v)
+            };
+        }).filter(d => d.time); // Filter out rows with invalid dates
+        return data;
+    } catch (error) {
+        console.error(`Error fetching data for sheet ${sheetName}:`, error);
+        return []; // Return empty array on error
+    }
+}
+
+// Fetch all sheets' data
+async function fetchAllSheets() {
+    fullDataBySheet = {};
+    const fetchPromises = SERVER_CONFIGS.map(async config => {
+        const data = await fetchSheetData(config.name);
+        fullDataBySheet[config.name] = data;
+    });
+    await Promise.all(fetchPromises);
+    document.getElementById("latest_time").innerText = 'อัปเดตล่าสุด: ' + new Date().toLocaleString('th-TH');
+}
+
+// Draw gauge cards for each server
+function drawGauges() {
+    const gaugeContainer = document.getElementById('gauges_section');
+    gaugeContainer.innerHTML = ''; // Clear previous gauges
+
+    SERVER_CONFIGS.forEach(config => {
+        const sheetName = config.name;
+        const displayName = config.displayName; // ใช้ชื่อแสดงผลตรงนี้
+        const last = fullDataBySheet[sheetName]?.at(-1);
+
+        // Handle cases where data might not be available or is old
+        if (!last || !last.time || last.temp === null || last.hum === null) { // ตรวจสอบ null ชัดเจน
+            console.warn(`No valid latest data for ${displayName}. Skipping gauge creation.`);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'gauge-wrapper offline';
+            wrapper.style.backgroundColor = config.color;
+            wrapper.innerHTML = `
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <img src="${IMAGE_URLS.offline}" alt="offline" style="width: 80px; height: auto;">
+                    <div style="text-align: left; font-size: 0.95rem;">
+                        <div><strong>${displayName}</strong> <span style="color:red">Offline / No Data</span></div>
+                        <div>ไม่พบข้อมูลล่าสุด หรือข้อมูลไม่สมบูรณ์</div>
+                        <button class="llm-button" onclick="explainStatus('${config.name}', null, null, null, true, false, '${displayName}')">✨ อธิบายสถานะ</button>
+                    </div>
+                </div>
+            `;
+            gaugeContainer.appendChild(wrapper);
+            return; // Skip to next server if data is invalid
+        }
+
+        const timeDiffMinutes = (new Date() - last.time) / (1000 * 60);
+        const isOffline = timeDiffMinutes > OFFLINE_THRESHOLD_MINUTES;
+        const isOutOfRange = last.temp < config.tempMin || last.temp > config.tempMax;
+
+        let imageUrl = IMAGE_URLS.online;
+        let onlineStatusText = '<span style="color:green">Online</span>';
+        let additionalClass = '';
+        let llmButtonHtml = '';
+
+        if (isOffline) {
+            imageUrl = IMAGE_URLS.offline;
+            onlineStatusText = '<span style="color:red">Offline</span>';
+            additionalClass = 'offline';
+            llmButtonHtml = `<button class="llm-button" onclick="explainStatus('${config.name}', ${last.temp}, ${last.hum}, '${last.time.toISOString()}', true, ${isOutOfRange}, '${displayName}')">✨ อธิบายสถานะ</button>`;
+        } else if (isOutOfRange) {
+            imageUrl = IMAGE_URLS.outOfRange;
+            additionalClass = 'alert';
+            llmButtonHtml = `<button class="llm-button" onclick="explainStatus('${config.name}', ${last.temp}, ${last.hum}, '${last.time.toISOString()}', false, true, '${displayName}')">✨ อธิบายสถานะ</button>`;
+        }
+
+        const wrapper = document.createElement('div');
+        wrapper.className = `gauge-wrapper ${additionalClass}`;
+        wrapper.style.backgroundColor = config.color; // Set individual background color
+
+        wrapper.innerHTML = `
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <img src="${imageUrl}" alt="status icon" style="width: 80px; height: auto;">
+                <div style="text-align: left; font-size: 0.95rem;">
+                    <div><strong>${displayName}</strong> ${onlineStatusText}</div>
+                    <div>📅 Time: ${last.time.toLocaleString('th-TH')}</div>
+                    <div>🌡️ Temp: ${last.temp.toFixed(1)}°C</div>
+                    <div>💧 Humid: ${last.hum.toFixed(1)}%</div>
+                    ${llmButtonHtml}
+                </div>
+            </div>
+        `;
+        gaugeContainer.appendChild(wrapper);
+    });
+}
+
+// Function to draw combined temperature chart
+function drawCombinedChart() {
+    const now = new Date();
+    const start = new Date(now.getTime() - currentRange * 60 * 60 * 1000);
+    const timestamps = new Set();
+    const alignedData = {};
+
+    SERVER_CONFIGS.forEach(config => {
+        alignedData[config.name] = fullDataBySheet[config.name]?.filter(d => d.time >= start && d.temp !== null) || [];
+        alignedData[config.name].forEach(d => timestamps.add(d.time.getTime()));
+    });
+
+    const uniqueTimes = Array.from(timestamps).sort().map(t => new Date(parseInt(t)));
+    const chartArray = [['Time', ...SERVER_CONFIGS.map(s => s.displayName)]]; // ใช้ displayName ในหัวกราฟ
+
+    uniqueTimes.forEach(time => {
+        const row = [time];
+        SERVER_CONFIGS.forEach(config => {
+            const point = alignedData[config.name].find(d => d.time.getTime() === time.getTime());
+            row.push(point ? point.temp : null);
+        });
+        chartArray.push(row);
+    });
+
+    // Ensure there's at least one data point for the chart to render
+    if (chartArray.length <= 1) {
+        document.getElementById('chart_div').innerHTML = '<div style="text-align:center; padding:20px; color:#999;">ไม่มีข้อมูลอุณหภูมิสำหรับช่วงเวลาที่เลือก</div>';
+        return;
+    }
+
+    const data = google.visualization.arrayToDataTable(chartArray);
+    const options = {
+        title: `อุณหภูมิย้อนหลัง ${currentRange} ชั่วโมง`,
+        hAxis: { title: 'เวลา', format: 'dd/MM HH:mm' },
+        vAxis: { title: 'อุณหภูมิ (°C)' },
+        lineWidth: 2,
+        pointSize: 4,
+        legend: { position: 'bottom' },
+        colors: SERVER_CONFIGS.map(s => s.color), // Use configured colors
+        animation: {startup: true, duration: 1000, easing: 'out'},
+        explorer: {
+            actions: ['dragToZoom', 'rightClickToReset'],
+            axis: 'horizontal',
+            keepInBounds: true,
+            maxZoomIn: 4.0
+        }
+    };
+    new google.visualization.LineChart(document.getElementById('chart_div')).draw(data, options);
+}
+
+// Function to draw humidity chart
+function drawHumidityChart() {
+    const now = new Date();
+    const start = new Date(now.getTime() - currentRange * 60 * 60 * 1000);
+    const timestamps = new Set();
+    const alignedData = {};
+
+    SERVER_CONFIGS.forEach(config => {
+        alignedData[config.name] = fullDataBySheet[config.name]?.filter(d => d.time >= start && d.hum !== null) || [];
+        alignedData[config.name].forEach(d => timestamps.add(d.time.getTime()));
+    });
+
+    const uniqueTimes = Array.from(timestamps).sort().map(t => new Date(parseInt(t)));
+    const chartArray = [['Time', ...SERVER_CONFIGS.map(s => s.displayName)]]; // ใช้ displayName ในหัวกราฟ
+
+    uniqueTimes.forEach(time => {
+        const row = [time];
+        SERVER_CONFIGS.forEach(config => {
+            const point = alignedData[config.name].find(d => d.time.getTime() === time.getTime());
+            row.push(point ? point.hum : null);
+        });
+        chartArray.push(row);
+    });
+
+    // Ensure there's at least one data point for the chart to render
+    if (chartArray.length <= 1) {
+        document.getElementById('humidity_chart').innerHTML = '<div style="text-align:center; padding:20px; color:#999;">ไม่มีข้อมูลความชื้นสำหรับช่วงเวลาที่เลือก</div>';
+        return;
+    }
+
+    const data = google.visualization.arrayToDataTable(chartArray);
+    const options = {
+        title: `ความชื้นย้อนหลัง ${currentRange} ชั่วโมง`,
+        hAxis: { title: 'เวลา', format: 'dd/MM HH:mm' },
+        vAxis: { title: 'ความชื้น (%)' },
+        lineWidth: 2,
+        pointSize: 4,
+        legend: { position: 'bottom' },
+        colors: SERVER_CONFIGS.map(s => { /* Slightly different colors for humidity if desired */
+            // ใช้สีเดิม หรือปรับแต่งได้ตามความต้องการ
+            if (s.name === 'Server1') return '#FFB6B9';
+            if (s.name === 'Server2') return '#A5D8FF';
+            if (s.name === 'Server3') return '#C3FBA6';
+            return '#D3D3D3'; // Default fallback
+        }),
+        animation: {startup: true, duration: 1000, easing: 'out'},
+        explorer: {
+            actions: ['dragToZoom', 'rightClickToReset'],
+            axis: 'horizontal',
+            keepInBounds: true,
+            maxZoomIn: 4.0
+        }
+    };
+    new google.visualization.LineChart(document.getElementById('humidity_chart')).draw(data, options);
+}
+
+// Update chart range and redraw
+function updateChart(range, event) {
+    currentRange = range;
+    document.querySelectorAll('.range-buttons button').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    drawCombinedChart();
+    drawHumidityChart();
+}
+
+// Real-time clock update
+function updateClock() {
+    const now = new Date();
+    document.getElementById("realtime_clock").innerText = `วันเวลาปัจจุบัน: ${now.toLocaleString('th-TH', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        hour: '2-digit', minute:'2-digit', second:'2-digit', hour12: false
+    })}`;
+}
+
+// Populate server dropdown
+function populateServerSelect() {
+    const serverSelect = document.getElementById('serverSelect');
+    // ใช้ displayName สำหรับแสดงผลใน dropdown
+    serverSelect.innerHTML = SERVER_CONFIGS.map(config => `<option value="${config.name}">${config.displayName}</option>`).join('');
+}
+
+// Populate month dropdown
+function populateMonthSelect() {
+    const monthSelect = document.getElementById('monthSelect');
+    const monthNames = [
+        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+    ];
+    monthSelect.innerHTML = monthNames.map((name, index) => `<option value="${index}">${name}</option>`).join('');
+    // Set current month as default
+    monthSelect.value = new Date().getMonth();
+}
+
+// Initialization function
+async function init() {
+    populateServerSelect();
+    populateMonthSelect();
+    await fetchAllSheets();
+    drawGauges();
+    drawCombinedChart();
+    drawHumidityChart();
+
+    // Set interval for data refresh (every 5 minutes)
+    setInterval(async () => {
+        await fetchAllSheets();
+        drawGauges();
+        drawCombinedChart();
+        drawHumidityChart();
+    }, 300000); // 300000 ms = 5 minutes
+
+    // Set interval for real-time clock (every 1 second)
+    setInterval(updateClock, 1000);
+    updateClock(); // Initial clock update
+}
+
+// Load Google Charts and then call init
+google.charts.load('current', {'packages':['corechart', 'gauge']});
+google.charts.setOnLoadCallback(init);
+</script>
+
+<!-- Add html2canvas and jspdf libraries for better PDF export -->
+<!-- IMPORTANT: Ensure these scripts are loaded BEFORE your custom script that uses them -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+// --- Start of Font Embedding for jsPDF (สำหรับภาษาไทย) ---
+// Base64 String ของ Font TH Sarabun PSK (คัดลอกมาจากที่คุณให้มา)
+const THSarabunPSK_Base64 = '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BIAEP/3ABMAEf/3ABQAEf/2ABUAEv/2ABYAE//1ABcAFP/1ABgAFf/0ABkAFv/0ABoAF//0ABsAF//zABwAGP/zAB0AGf/yAB4AGv/yAB8AG//xACAAHP/xACEAHf/wACIAHf/wACMAHv/vACQAH//vACUAIP/uACYAIf/uACcAIv/uACgAIv/tACkAI//tACoAJP/sACsAJf/sACwAJv/rAC0AJ//rAC4AKP/qAC8AKP/qADAAKf/pADEAKv/pADIAK//pADMALP/oADQALf/oADUALv/nADYALv/nADcAL//mADgAMP/mADkAMf/lADoAMv/lADsAM//kADwAM//kAD0ANP/jAD4ANf/jAD8ANv/jAEAAN//iAEEAOP/iAEIAOf/hAEMAOf/hAEQAOv/gAEUAO//gAEYAPP/fAEcAPf/fAEgAPv/eAEkAP//eAEoAP//dAEsAQP/dAEwAQf/dAE0AQv/cAE4AQ//cAE8ARP/bAFAARP/bAFEARf/aAFIARv/aAFMAR//ZAFQASP/ZAFUASf/YAFYASv/YAFcASv/XAFgAS//XAFkATP/XAFoATf/WAFsATv/WAFwAT//VAF0AUP/VAF4AUP/UAF8AUf/UAGAAUv/TAGEAU//TAGIAVP/SAGMAVf/SAGQAVf/SAGUAVv/RAGYAV//RAGcAWP/QAGgAWf/QAGkAWv/PAGoAW//PAGsAW//OAGwAXP/OAG0AXf/NAG4AXv/NAG8AX//MAHAAYP/MAHEAYf/MAHIAYf/LAHMAYv/KAHUAZP/KAHYAZf/JAHcAZv/JAHgAZv/IAHkAZ//IAHoAaP/HAHsAaf/HAHwAav/GAH0Aa//GAH4AbP/FAIAAbf/FAIEAbv/EAIIAb//EAIMAcP/DAIQAcf/DAIUAcv/CAIYAcv/CAIcAc//BAIgAdP/BAIkAdf/AAIoAdv/AAIsAd//AAIwAd/+/AI0AeP+/AI4Aef++AI8Aev++AJAAe/+9AJEAfP+9AJIAff+8AJMAff+8AJQAfv+7AJUAf/+7AJYAgP+7AJcAgf+6AJgAgv+6AJkAg/+5AJoAg/+5AJsAhP+4AJwAhf+4AJ0Ahv+3AJ4Ah/+3AJ8AiP+2AKAAiP+2AKEAif+1AKIAiv+1AKMAi/+1AKQAjP+0AKUAjf+0AKYAjv+zAKcAjv+zAKgAj/+yAKkAkP+yA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';
+
+// ฟังก์ชันสำหรับฝัง Font ภาษาไทยลงใน jsPDF
+function addThaiFont(pdf) {
+    if (THSarabunPSK_Base64) { // ตรวจสอบว่ามี Base64 String ของ Font หรือไม่
+        console.log("THSarabunPSK_Base64 length:", THSarabunPSK_Base64.length); // Log the length for debugging
+        try {
+            pdf.addFileToVFS('THSarabunPSK.ttf', THSarabunPSK_Base64); // ชื่อไฟล์ .ttf
+            pdf.addFont('THSarabunPSK.ttf', 'TH Sarabun PSK', 'normal'); // ชื่อ Font ที่ใช้ในโค้ด
+            
+            // --- เพิ่มการตรวจสอบ Font โดยละเอียดขึ้น ---
+            if (pdf.internal && typeof pdf.internal.getFontList === 'function') {
+                const fontList = pdf.internal.getFontList();
+                console.log("jsPDF Font List AFTER addFont:", fontList);
+                if (fontList['TH Sarabun PSK'] && fontList['TH Sarabun PSK']['normal']) {
+                    console.log("TH Sarabun PSK font 'normal' found in jsPDF internal list.");
+                    const fontObj = pdf.internal.getFont('TH Sarabun PSK', 'normal');
+                    console.log("Font Object after addFont:", fontObj);
+                    if (fontObj && fontObj.metadata && fontObj.metadata.widths) {
+                        console.log("Font widths metadata is available. Length:", Object.keys(fontObj.metadata.widths).length);
+                        pdf.setFont('TH Sarabun PSK', 'normal'); // ตั้งค่า Font ที่จะใช้
+                        console.log("Thai font 'TH Sarabun PSK' embedded and set successfully.");
+                    } else {
+                        console.error("Font widths metadata is NOT available. This is the likely root cause of the 'undefined (reading '0')' error. Thai font may not display correctly.");
+                        // Fallback to a default font if custom font metadata is missing
+                        pdf.setFont('Helvetica', 'normal'); 
+                        console.warn("Falling back to 'Helvetica' font for PDF due to missing Thai font metadata.");
+                    }
+                } else {
+                    console.error("TH Sarabun PSK font NOT found or 'normal' style missing in jsPDF internal list after addFont. This is likely the cause of the error. Thai font may not display correctly.");
+                    // Fallback to a default font if custom font not found
+                    pdf.setFont('Helvetica', 'normal'); 
+                    console.warn("Falling back to 'Helvetica' font for PDF as TH Sarabun PSK was not properly registered.");
+                }
+            } else {
+                console.error("jsPDF internal font list not accessible. Cannot verify font registration. Thai font may not display correctly.");
+                pdf.setFont('Helvetica', 'normal'); 
+                console.warn("Falling back to 'Helvetica' font for PDF due to jsPDF internal limitations.");
+            }
+            // --- สิ้นสุดการตรวจสอบ Font โดยละเอียดขึ้น ---
+
+        } catch (fontError) {
+            console.error("Error embedding or setting TH Sarabun PSK font:", fontError);
+            showMessageBox('ข้อผิดพลาด Font', `เกิดข้อผิดพลาดในการฝัง Font TH Sarabun PSK: ${fontError.message} โปรดตรวจสอบ Base64 String ของ Font`, false);
+            // Fallback to a default font if any error occurs during font embedding
+            pdf.setFont('Helvetica', 'normal'); 
+            console.warn("Falling back to 'Helvetica' font for PDF due to an error during TH Sarabun PSK embedding.");
+        }
+    } else {
+        console.warn("THSarabunPSK_Base64 is empty. Thai font not embedded. Thai text in PDF might be garbled.");
+        pdf.setFont('Helvetica', 'normal'); // Fallback if Base64 is empty
+        console.warn("Falling back to 'Helvetica' font for PDF as THSarabunPSK_Base64 is empty.");
+    }
+}
+// --- End of Font Embedding for jsPDF ---
+
+// --- Generic Message Box Functions ---
+function showMessageBox(title, message, showSpinner = false) {
+    const overlay = document.getElementById('messageBoxOverlay');
+    const titleElement = document.getElementById('messageBoxTitle');
+    const messageElement = document.getElementById('messageBoxMessage');
+    const spinnerElement = document.getElementById('messageBoxSpinner');
+    const closeButton = overlay.querySelector('button');
+
+    titleElement.innerText = title;
+    messageElement.innerText = message;
+
+    if (showSpinner) {
+        spinnerElement.style.display = 'block';
+        messageElement.style.display = 'none'; // Hide message while loading
+        closeButton.style.display = 'none'; // Hide close button while loading
+    } else {
+        spinnerElement.style.display = 'none';
+        messageElement.style.display = 'block';
+        closeButton.style.display = 'block';
+    }
+
+    overlay.classList.add('visible');
+}
+
+function hideMessageBox() {
+    document.getElementById('messageBoxOverlay').classList.remove('visible');
+}
+// --- End of Generic Message Box Functions ---
+
+// --- LLM Integration Functions ---
+async function explainStatus(serverId, currentTemp, currentHum, lastUpdateTime, isOffline, isOutOfRange, displayName) {
+    showMessageBox('กำลังประมวลผล...', 'โปรดรอสักครู่ AI กำลังวิเคราะห์สถานะ...', true);
+
+    const config = SERVER_CONFIGS.find(s => s.name === serverId);
+    let prompt = '';
+
+    if (isOffline) {
+        let offlineDuration = 'ไม่ทราบระยะเวลา';
+        if (lastUpdateTime) {
+            const lastTime = new Date(lastUpdateTime);
+            const timeDiffMinutes = (new Date() - lastTime) / (1000 * 60);
+            offlineDuration = `${timeDiffMinutes.toFixed(0)} นาที`;
+        }
+        prompt = `เซิร์ฟเวอร์ ${displayName} ออฟไลน์มานานประมาณ ${offlineDuration} อธิบายสถานะนี้และผลกระทบที่อาจเกิดขึ้น พร้อมคำแนะนำเบื้องต้นในการแก้ไขเป็นภาษาไทย`;
+    } else if (isOutOfRange) {
+        let tempStatus = '';
+        let humStatus = '';
+
+        if (currentTemp !== null && (currentTemp < config.tempMin || currentTemp > config.tempMax)) {
+            tempStatus = `อุณหภูมิ ${currentTemp.toFixed(1)}°C ซึ่งอยู่นอกช่วงปกติ ${config.tempMin}°C ถึง ${config.tempMax}°C`;
+        }
+        // Assuming humidity also has a normal range, if not, this part can be removed or adjusted.
+        // For this example, I'll assume a general acceptable humidity range for server rooms (e.g., 40-60%)
+        // If you have specific humidity ranges for each server, add humMin/humMax to SERVER_CONFIGS
+        const defaultHumMin = 40;
+        const defaultHumMax = 60;
+        if (currentHum !== null && (currentHum < defaultHumMin || currentHum > defaultHumMax)) {
+            humStatus = `ความชื้น ${currentHum.toFixed(1)}% ซึ่งอยู่นอกช่วงปกติ ${defaultHumMin}% ถึง ${defaultHumMax}%`;
+        }
+
+        if (tempStatus && humStatus) {
+            prompt = `เซิร์ฟเวอร์ ${displayName} มีปัญหาทั้งอุณหภูมิและความชื้น: ${tempStatus} และ ${humStatus} อธิบายสถานะนี้และผลกระทบที่อาจเกิดขึ้น พร้อมคำแนะนำเบื้องต้นในการแก้ไขเป็นภาษาไทย`;
+        } else if (tempStatus) {
+            prompt = `เซิร์ฟเวอร์ ${displayName} มี ${tempStatus} อธิบายสถานะนี้และผลกระทบที่อาจเกิดขึ้น พร้อมคำแนะนำเบื้องต้นในการแก้ไขเป็นภาษาไทย`;
+        } else if (humStatus) {
+            prompt = `เซิร์ฟเวอร์ ${displayName} มี ${humStatus} อธิบายสถานะนี้และผลกระทบที่อาจเกิดขึ้น พร้อมคำแนะนำเบื้องต้นในการแก้ไขเป็นภาษาไทย`;
+        } else {
+            prompt = `เซิร์ฟเวอร์ ${displayName} อยู่ในสถานะแจ้งเตือน แต่ข้อมูลอุณหภูมิและความชื้นดูปกติ. อาจมีปัญหาอื่น ๆ. อธิบายสถานะนี้และผลกระทบที่อาจเกิดขึ้น พร้อมคำแนะนำเบื้องต้นในการแก้ไขเป็นภาษาไทย`;
+        }
+
+    } else {
+        prompt = `เซิร์ฟเวอร์ ${displayName} กำลังทำงานเป็นปกติ. อธิบายว่าสถานะปกติหมายถึงอะไรและมีความสำคัญอย่างไรในบริบทของห้องเซิร์ฟเวอร์เป็นภาษาไทย`;
+    }
+
+    console.log("LLM Prompt:", prompt);
+
+    try {
+        let chatHistory = [];
+        chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+        const payload = { contents: chatHistory };
+        const apiKey = ""; // If you want to use models other than gemini-2.0-flash or imagen-3.0-generate-002, provide an API key here. Otherwise, leave this as-is.
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        let llmResponseText = "ไม่สามารถรับคำอธิบายจาก AI ได้ โปรดลองอีกครั้ง";
+
+        if (result.candidates && result.candidates.length > 0 &&
+            result.candidates[0].content && result.candidates[0].content.parts &&
+            result.candidates[0].content.parts.length > 0) {
+            llmResponseText = result.candidates[0].content.parts[0].text;
+        } else {
+            console.error("Unexpected LLM response structure:", result);
+            llmResponseText = "เกิดข้อผิดพลาดในการประมวลผลคำตอบจาก AI";
+        }
+        showMessageBox('สถานะเซิร์ฟเวอร์', llmResponseText, false);
+
+    } catch (error) {
+        console.error("Error calling Gemini API:", error);
+        showMessageBox('ข้อผิดพลาด', `เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI: ${error.message}`, false);
+    }
+}
+// --- End of LLM Integration Functions ---
+
+async function exportMonthlyPDF() {
+    console.log("1. exportMonthlyPDF function called.");
+    try {
+        const serverId = document.getElementById('serverSelect').value;
+        const selectedServerConfig = SERVER_CONFIGS.find(config => config.name === serverId);
+        const serverDisplayName = selectedServerConfig ? selectedServerConfig.displayName : serverId;
+
+        const monthSelect = document.getElementById('monthSelect');
+        const month = parseInt(monthSelect.value);
+        const monthName = monthSelect.options[month].text;
+        const year = new Date().getFullYear();
+
+        const data = (fullDataBySheet[serverId] || []).filter(d => d.time && d.time.getMonth() === month && d.time.getFullYear() === year);
+
+        if (data.length === 0) {
+            showMessageBox('ข้อมูลไม่พร้อมใช้งาน', 'ไม่มีข้อมูลสำหรับเดือนและเครื่องที่เลือก', false);
+            console.warn('No data for selected month and server.');
+            return;
+        }
+        console.log("2. Data filtered and available.");
+
+        const chartArray = [['Time', 'อุณหภูมิ (°C)', 'ความชื้น (%)']];
+        data.forEach(d => chartArray.push([d.time, d.temp, d.hum]));
+
+        // Temporarily create a hidden div to render the chart for PDF export
+        const tempDiv = document.createElement('div');
+        tempDiv.id = 'tempChartDiv'; // Added ID for easier removal
+        tempDiv.style.width = '1000px';
+        tempDiv.style.height = '600px';
+        tempDiv.style.position = 'absolute';
+        tempDiv.style.left = '-9999px';
+        tempDiv.style.background = '#ffffff'; // Ensure background is white for capture
+        document.body.appendChild(tempDiv);
+        console.log("3. tempDiv created and appended.");
+
+        // Draw the chart in the hidden div
+        const googleData = google.visualization.arrayToDataTable(chartArray);
+        const options = {
+            title: `กราฟอุณหภูมิ และความชื้น : ${serverDisplayName} เดือน ${monthName} ปี ${year}`,
+            hAxis: { title: 'เวลา', format: 'dd/MM HH:mm' },
+            vAxis: { title: 'ค่า' },
+            series: {
+                0: { targetAxisIndex: 0, color: '#fb923c' },
+                1: { targetAxisIndex: 1, color: '#60a5fa' }
+            },
+            vAxes: {
+                0: { title: 'อุณหภูมิ (°C)' },
+                1: { title: 'ความชื้น (%)', maxValue: 100 }
+            },
+            lineWidth: 2,
+            pointSize: 3,
+            legend: { position: 'bottom' },
+            animation: { startup: true, duration: 500, easing: 'out' }
+        };
+
+        const chart = new google.visualization.LineChart(tempDiv);
+
+        // Always draw the chart and wait for the 'ready' event
+        await new Promise(resolve => {
+            google.visualization.events.addListener(chart, 'ready', resolve);
+            chart.draw(googleData, options);
+        });
+        console.log("4. Google Chart drawn and ready.");
+
+        // Add a small delay to ensure rendering is complete
+        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
+        console.log("5. Small delay completed.");
+
+        // Capture the chart as an image
+        const canvas = await html2canvas(tempDiv, { scale: 2 });
+        const imgData = canvas.toDataURL('image/png');
+        console.log("6. html2canvas captured image.");
+
+        // Clean up the temporary div
+        document.body.removeChild(tempDiv);
+        console.log("7. tempDiv removed.");
+
+        // Generate PDF
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+
+        // --- เรียกใช้ฟังก์ชันฝัง Font ที่นี่ ---
+        addThaiFont(pdf);
+        // --- สิ้นสุดการเรียกใช้ฟังก์ชันฝัง Font ---
+
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        
+        console.log("8. Logo section skipped (removed)."); 
+
+        // Add title - ปรับตำแหน่ง Y ขึ้นมา
+        let currentY = 20; // เริ่มต้นที่ 20mm จากขอบบน
+        pdf.setFont('TH Sarabun PSK', 'normal'); // ตั้งค่า Font อีกครั้งเพื่อให้แน่ใจว่าใช้ Font ที่ฝัง
+        pdf.setFontSize(16);
+        pdf.text(`รายงานอุณหภูมิและความชื้น ${serverDisplayName}`, pdfWidth / 2, currentY, { align: 'center' });
+        currentY += 10; // เพิ่มระยะห่าง
+        pdf.text(`เดือน ${monthName} ปี ${year}`, pdfWidth / 2, currentY, { align: 'center' });
+        currentY += 20; // เพิ่มระยะห่างก่อนกราฟ
+        console.log("9. Titles added to PDF.");
+
+        // Add chart image - ปรับตำแหน่ง Y ขึ้นมา
+        const imgProps = pdf.getImageProperties(imgData);
+        const imgWidth = pdfWidth - 20;
+        const imgHeight = imgProps.height * imgWidth / imgProps.width;
+        pdf.addImage(imgData, 'PNG', 10, currentY, imgWidth, imgHeight);
+        console.log("10. Chart image added to PDF.");
+
+        // Add data table
+        pdf.addPage();
+        pdf.setFontSize(12);
+        pdf.text(`ข้อมูลดิบสำหรับ ${serverDisplayName} เดือน ${monthName} ปี ${year}`, 10, 20);
+
+        const tableHeaders = [['เวลา', 'อุณหภูมิ (°C)', 'ความชื้น (%)']];
+        const tableData = data.map(d => [
+            d.time.toLocaleString('th-TH'),
+            d.temp !== null ? d.temp.toFixed(1) : '-',
+            d.hum !== null ? d.hum.toFixed(1) : '-'
+        ]);
+
+        pdf.autoTable({
+            head: tableHeaders,
+            body: tableData,
+            startY: 30,
+            margin: { top: 20, left: 10, right: 10 },
+            headStyles: { fillColor: [124, 58, 237], textColor: [255, 255, 255], fontStyle: 'bold' },
+            styles: {
+                font: 'TH Sarabun PSK', // ตั้งค่า Font สำหรับตาราง
+                fontSize: 8,
+                cellPadding: 2,
+                overflow: 'linebreak'
+            },
+            columnStyles: {
+                0: { cellWidth: 45 },
+                1: { cellWidth: 25 },
+                2: { cellWidth: 25 }
+            },
+        });
+        console.log("11. Data table added to PDF.");
+
+        pdf.save(`รายงานอุณหภูมิ-ความชื้น-${serverDisplayName}-${monthName}-${year}.pdf`);
+        console.log("12. PDF save initiated.");
+
+    } catch (error) {
+        console.error("Error during PDF export:", error);
+    } finally {
+        const tempDiv = document.getElementById('tempChartDiv');
+        if (tempDiv && tempDiv.parentNode) {
+            tempDiv.parentNode.removeChild(tempDiv);
+            console.log("13. tempDiv removed in finally block.");
+        }
+    }
+}
+</script>
+
+</body>
+</html>
